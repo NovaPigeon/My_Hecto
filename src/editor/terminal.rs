@@ -6,14 +6,14 @@ use std::io::{stdout, Write};
 use crossterm::style::Print;
 
 
-#[derive(Debug,Clone, Copy)]
+#[derive(Debug,Clone, Copy,Default)]
 pub struct Position
 {
     pub x:usize,
     pub y:usize
 }
 
-#[derive(Debug,Clone, Copy)]
+#[derive(Debug,Clone, Copy,Default)]
 pub struct Size
 {
     pub width:usize,
@@ -49,11 +49,13 @@ impl Terminal {
     }
     // move the cursor to the correspond position
     pub fn move_cursor_to(pos:Position)->Result<(),std::io::Error>{
+        #[allow(clippy::as_conversions, clippy::cast_possible_truncation)]
         Self::queue_cmd(MoveTo(pos.x as u16,pos.y as u16))?;
         Ok(())
     }
     pub fn terminal_size()->Result<Size,std::io::Error>{
         let (width,height)=size()?;
+        #[allow(clippy::as_conversions, clippy::cast_possible_truncation)]
         Ok(Size{width:width as usize,height:height as usize})
     }
 
