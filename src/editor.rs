@@ -1,5 +1,8 @@
+use crossterm::event::Event;
 use crossterm::event::{read, Event::Key, KeyCode::Char,KeyEvent,KeyModifiers};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode,Clear,ClearType};
+use crossterm::execute;
+use std::io::stdout;
 
 pub struct Editor {
     // 表明 Editor 是否应该中断循环退出(Control+C)
@@ -10,35 +13,55 @@ impl Editor {
     pub fn default() -> Self {
         Editor {is_quit:false}
     }
-    // 调用实现函数，wrap 错误
-    pub fn run(&mut self) {// 因为会修改 is_quit, 所以改成可变引用
-        if let Err(err)=self.repl() {
-            panic!("{err:#?}");
-        }
-        println!("Goodbye.\r\n");
+    pub fn run(&mut self){
+
+        Self::initialize().unwrap();
+        let result=self.repl();
+        Self::terminate().unwrap();
+        result.unwrap();
     }
-    // 实现函数，可以传播错误
-    fn repl(&mut self)->Result<(),std::io::Error> {
-        // 错误传播
+
+    // Enter raw mode and clean the screen
+    fn initialize()->Result<(),std::io::Error> {
         enable_raw_mode()?;
+        Self::clear_screen()
+    }
+    // Disable the raw mode
+    fn terminate()->Result<(),std::io::Error> {
+        disable_raw_mode()
+    }
+    fn clear_screen()->Result<(),std::io::Error>{
+        let mut output=stdout();
+        // clear the screen
+        execute!(output,Clear(ClearType::All))
+    }
+    fn repl(&mut self)->Result<(),std::io::Error>{
         loop {
-            // 把输入进一步分解
-            if let Key(KeyEvent{
-                code,modifiers,kind,state
-            })=read()? {
-                println!("Code: {code:?} Modifiers: {modifiers:?} Kind: {kind:?} State: {state:?} \r");
-                match code {
-                    Char('q') if modifiers==KeyModifiers::CONTROL => {
-                        self.is_quit=true;
-                    },
-                    _=>()
-                }
-                if self.is_quit {
-                    break;
-                }
+            let event=read()?;
+            self.evaluate_event(&event);
+            self.refresh_screen()?;
+            if self.is_quit {
+                break;
             }
         }
-        disable_raw_mode()?;
+        Ok(())
+    }
+    fn evaluate_event(&mut self,event:&Event){
+        if let Key(KeyEvent { code, modifiers, ..})=event {
+            match code {
+                // Quit with Ctrl+q
+                Char('q') if *modifiers==KeyModifiers::CONTROL=>{
+                    self.is_quit=true;
+                }
+                _=>(),
+            }
+        }
+    }
+    fn refresh_screen(&self)->Result<(),std::io::Error>{
+        if self.is_quit{
+            Self::clear_screen()?;
+            print!("Goodbye.\r\n");
+        }
         Ok(())
     }
 }
