@@ -12,7 +12,8 @@ use view::View;
 pub struct Editor {
     // 表明 Editor 是否应该中断循环退出(Control+C)
     is_quit:bool,
-    pos: Position
+    pos: Position,
+    view: View
 }
 
 impl Editor {
@@ -20,6 +21,7 @@ impl Editor {
     pub fn run(&mut self){
 
         Terminal::initialize().unwrap();
+        self.handle_args();
         let result=self.repl();
         Terminal::terminate().unwrap();
         result.unwrap();
@@ -94,11 +96,17 @@ impl Editor {
             Terminal::clear_screen()?;
             Terminal::print("Goodbye.\r\n")?;
         } else {
-            View::render()?;
+            self.view.render()?;
             Terminal::move_cursor_to(self.pos)?;
         }
         Terminal::show_cursor()?;
         Terminal::flush()?;
         Ok(())
+    }
+    fn handle_args(&mut self){
+        let args: Vec<String>=std::env::args().collect();
+        if let Some(file_name)=args.get(1){
+            self.view.load(file_name);
+        }
     }
 }

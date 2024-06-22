@@ -2,8 +2,11 @@ const NAME: &str=env!("CARGO_PKG_NAME");
 const VERSION: &str=env!("CARGO_PKG_VERSION");
 
 use super::terminal::Terminal;
+mod buffer;
+use  buffer::Buffer;
+#[derive(Default)]
 pub struct View {
-
+    buf: Buffer
 }
 
 impl View {
@@ -28,14 +31,35 @@ impl View {
         Terminal::print(msg)?;
         Ok(())
     }
-    pub fn render()->Result<(),std::io::Error>{
+    pub fn render(&self)->Result<(),std::io::Error>{
+        if self.buf.is_empty() {
+            self.render_welcome()?;
+        } else {
+            self.render_buffer()?;
+        }
+        Ok(())
+
+    }
+    pub fn render_buffer(&self)->Result<(),std::io::Error>{
         let height=Terminal::terminal_size()?.height;
         for row_num in 0..height-1{
             Terminal::clear_line()?;
+            if let Some(s)=self.buf.lines.get(row_num) {
+                Terminal::print(s)?;
+            } else {
+                Self::draw_empty_row()?;
+            }
+            Self::draw_line_feed()?;
+        }
+        Self::draw_empty_row()?;
+        Ok(())
+    }
+
+    pub fn render_welcome(&self)->Result<(),std::io::Error>{
+        let height=Terminal::terminal_size()?.height;
+        for row_num in 0..height-1{
             #[allow(clippy::integer_division)]
-            if row_num==1 {
-                Terminal::print("Hello World!\r\n")?;
-            } else if row_num==height/3 {
+            if row_num==height/3 {
                 Self::draw_welcome_info()?;
             } else {
                 Self::draw_empty_row()?;
@@ -45,5 +69,11 @@ impl View {
         Self::draw_empty_row()?;
         Ok(())
 
+    }
+    
+    pub fn load(&mut self,file_name:&str){
+        if let Ok(buffer)=Buffer::load(file_name){
+            self.buf=buffer;
+        }
     }
 }
