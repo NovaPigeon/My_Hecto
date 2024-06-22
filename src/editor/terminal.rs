@@ -1,6 +1,7 @@
 use crossterm::cursor::{MoveTo,Hide,Show};
-use crossterm::{execute, queue};
+use crossterm::{queue,Command};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType};
+use std::fmt::Display;
 use std::io::{stdout, Write};
 use crossterm::style::Print;
 
@@ -15,8 +16,8 @@ pub struct Position
 #[derive(Debug,Clone, Copy)]
 pub struct Size
 {
-    pub height:u16,
-    pub width:u16
+    pub width:u16,
+    pub height:u16
 }
 
 // 管理有关终端初始化和退出的事宜
@@ -33,34 +34,35 @@ impl Terminal {
     }
     // Disable the raw mode
     pub fn terminate()->Result<(),std::io::Error> {
+        Self::flush()?;
         disable_raw_mode()?;
         Ok(())
     }
     pub fn clear_screen()->Result<(),std::io::Error>{
         // clear the screen
-        execute!(stdout(),Clear(ClearType::All))?;
+        Self::queue_cmd(Clear(ClearType::All))?;
         Ok(())
     }
     pub fn clear_line()->Result<(),std::io::Error>{
-        execute!(stdout(),Clear(ClearType::CurrentLine))?;
+        Self::queue_cmd(Clear(ClearType::CurrentLine))?;
         Ok(())
     }
     // move the cursor to the correspond position
     pub fn move_cursor_to(pos:Position)->Result<(),std::io::Error>{
-        queue!(stdout(),MoveTo(pos.x,pos.y))?;
+        Self::queue_cmd(MoveTo(pos.x,pos.y))?;
         Ok(())
     }
     pub fn terminal_size()->Result<Size,std::io::Error>{
-        let (height,width)=size()?;
-        Ok(Size{height,width})
+        let (width,height)=size()?;
+        Ok(Size{width,height})
     }
 
     pub fn hide_cursor()->Result<(),std::io::Error>{
-        queue!(stdout(),Hide)?;
+        Self::queue_cmd(Hide)?;
         Ok(())
     }
     pub fn show_cursor()->Result<(),std::io::Error>{
-        queue!(stdout(),Show)?;
+        Self::queue_cmd(Show)?;
         Ok(())
     }
 
@@ -68,8 +70,13 @@ impl Terminal {
         stdout().flush()?;
         Ok(())
     }
-    pub fn print(info:&str)->Result<(),std::io::Error>{
-        queue!(stdout(),Print(info))?;
+    pub fn print<T:Display>(msg:T)->Result<(),std::io::Error>{
+        Self::queue_cmd(Print(msg))?;
+        Ok(())
+    }
+
+    fn queue_cmd<T:Command>(cmd:T)->Result<(),std::io::Error>{
+        queue!(stdout(),cmd)?;
         Ok(())
     }
 }
