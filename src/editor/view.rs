@@ -1,79 +1,87 @@
 const NAME: &str=env!("CARGO_PKG_NAME");
 const VERSION: &str=env!("CARGO_PKG_VERSION");
 
-use super::terminal::Terminal;
+
+use super::terminal::{Terminal,Size};
 mod buffer;
 use  buffer::Buffer;
-#[derive(Default)]
+
 pub struct View {
-    buf: Buffer
+    buf: Buffer,
+    needs_redraw:bool,
+    size:Size
 }
 
 impl View {
+    pub fn resize(&mut self,new_size:Size){
+        self.size=new_size;
+        self.needs_redraw=true;
+    }
+    fn render_line(row:usize,msg:&str){
+        let result=Terminal::print_line(row, msg);
+        debug_assert!(result.is_ok(),"Failed to render line: {result:?}");
+    }
     
-    fn draw_empty_row()->Result<(),std::io::Error> {
-        Terminal::print("~")?;
-        Ok(())
-    }
-    fn draw_line_feed()->Result<(),std::io::Error> {
-        Terminal::print("\r\n")?;
-        Ok(())
-    }
-    fn draw_welcome_info()->Result<(),std::io::Error> {
+    fn make_welcome_info(width:usize)->String {
+        if width==0 {
+            return  " ".to_string();
+        }
         let mut msg=format!("{NAME} editor -- version {VERSION}");
-        let width=Terminal::terminal_size()?.width;
         let len=msg.len();
+        if width<=len{
+            return  "~".to_string();
+        }
         // Terminal::print(format!("{len} {width}\r\n"))?;
         let padding_num=(width.saturating_sub(len)).saturating_div(2);
         let padding=" ".repeat(padding_num-1);
         msg=format!("~{padding}{msg}");
         msg.truncate(width);
-        Terminal::print(msg)?;
-        Ok(())
+        msg
     }
-    pub fn render(&self)->Result<(),std::io::Error>{
-        if self.buf.is_empty() {
-            self.render_welcome()?;
-        } else {
-            self.render_buffer()?;
+    pub fn render(&mut self){
+        if !self.needs_redraw{
+            return;
         }
-        Ok(())
+        let Size{width,height}=self.size;
+        if height==0 || width==0 {
+            return;
+        }
 
-    }
-    pub fn render_buffer(&self)->Result<(),std::io::Error>{
-        let height=Terminal::terminal_size()?.height;
-        for row_num in 0..height-1{
-            Terminal::clear_line()?;
-            if let Some(s)=self.buf.lines.get(row_num) {
-                Terminal::print(s)?;
+        let vertical_center=height/3;
+        for row in 0..height {
+            if let Some(line) =self.buf.lines.get(row) {
+                let truncated_line = if line.len() >= width {
+                    &line[0..width]
+                } else {
+                    line
+                };
+                Self::render_line(row, truncated_line);
+            } else if row==vertical_center && self.buf.is_empty() {
+                Self::render_line(row, &Self::make_welcome_info(width));
+                
             } else {
-                Self::draw_empty_row()?;
+                Self::render_line(row, "~");
             }
-            Self::draw_line_feed()?;
         }
-        Self::draw_empty_row()?;
-        Ok(())
+        self.needs_redraw=false;
     }
 
-    pub fn render_welcome(&self)->Result<(),std::io::Error>{
-        let height=Terminal::terminal_size()?.height;
-        for row_num in 0..height-1{
-            #[allow(clippy::integer_division)]
-            if row_num==height/3 {
-                Self::draw_welcome_info()?;
-            } else {
-                Self::draw_empty_row()?;
-            }
-            Self::draw_line_feed()?;
-        }
-        Self::draw_empty_row()?;
-        Ok(())
-
-    }
     
     pub fn load(&mut self,file_name:&str){
         if let Ok(buffer)=Buffer::load(file_name){
             self.buf=buffer;
+            self.needs_redraw=true;
         }
     }
+}
+
+impl  Default for View {
+    fn default() -> Self {
+        Self {
+            buf: Buffer::default(),
+            needs_redraw:true,
+            size:Terminal::terminal_size().unwrap_or_default()
+        }
+    }
+    
 }

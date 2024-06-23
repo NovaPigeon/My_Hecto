@@ -1,6 +1,6 @@
 use crossterm::cursor::{MoveTo,Hide,Show};
 use crossterm::{queue,Command};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen};
 use std::fmt::Display;
 use std::io::{stdout, Write};
 use crossterm::style::Print;
@@ -27,13 +27,15 @@ impl Terminal {
     // Enter raw mode and clean the screen
     pub fn initialize()->Result<(),std::io::Error> {
         enable_raw_mode()?;
+        Self::enter_alternate_screen()?;
         Self::clear_screen()?;
-        Self::move_cursor_to(Position{x:0,y:0})?;
         Self::flush()?;
         Ok(())
     }
     // Disable the raw mode
     pub fn terminate()->Result<(),std::io::Error> {
+        Self::leave_alternate_screen()?;
+        Self::show_cursor()?;
         Self::flush()?;
         disable_raw_mode()?;
         Ok(())
@@ -79,6 +81,22 @@ impl Terminal {
 
     fn queue_cmd<T:Command>(cmd:T)->Result<(),std::io::Error>{
         queue!(stdout(),cmd)?;
+        Ok(())
+    }
+
+    pub fn print_line<T:Display>(row:usize,msg:T)->Result<(),std::io::Error>{
+        Self::move_cursor_to(Position{x:0,y:row})?;
+        Self::clear_line()?;
+        Self::print(msg)?;
+        Ok(())
+    }
+
+    pub fn enter_alternate_screen()->Result<(),std::io::Error>{
+        Self::queue_cmd(EnterAlternateScreen)?;
+        Ok(())
+    }
+    pub fn leave_alternate_screen()->Result<(),std::io::Error>{
+        Self::queue_cmd(LeaveAlternateScreen)?;
         Ok(())
     }
 }
