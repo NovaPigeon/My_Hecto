@@ -1,5 +1,6 @@
 use std::ops::Range;
 use core::cmp::min;
+use unicode_segmentation::UnicodeSegmentation;
 pub struct Line{
     string: String
 }
@@ -13,9 +14,13 @@ impl Line {
     pub fn get(&self,range:Range<usize>)->String{
         let st=range.start;
         let ed=min(self.string.len(),range.end);
-        self.string.get(st..ed).unwrap_or("").to_string()
+        self.string
+            .graphemes(true)
+            .skip(st)
+            .take(ed.saturating_sub(st))
+            .collect()
     }
     pub fn len(&self)->usize{
-        self.string.len()
+        self.string[..].graphemes(true).count()
     }
 }
