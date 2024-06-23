@@ -60,7 +60,7 @@ impl Editor {
                     if matches!(cmd, EditorCommand::Quit) {
                         self.should_quit = true;
                     } else {
-                        self.view.handle_cmd(cmd)
+                        self.view.handle_cmd(cmd);
                     }
                 },
                 Err(err) => {

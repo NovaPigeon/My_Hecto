@@ -1,6 +1,8 @@
 use super::terminal::{Position, Size, Terminal};
+use core::cmp::min;
 mod buffer;
 use  buffer::Buffer;
+use line::Line;
 mod  line;
 use super::editor_command::{EditorCommand,Direction};
 
@@ -51,19 +53,41 @@ impl View {
         msg
     }
 
+    #[allow(clippy::arithmetic_side_effects)]
     fn move_cursor(&mut self, dir:&Direction) {
         let Position { mut x, mut y } = self.cursor_pos;
-        let Size { width, height } = self.size;
+        let height = self.size.height;
         match dir {
             Direction::Up => y = y.saturating_sub(1),
             Direction::Down => y = y.saturating_add(1),
-            Direction::Left => x = x.saturating_sub(1),
-            Direction::Right => x = x.saturating_add(1),
-            Direction::PageUp => y = 0,
-            Direction::PageDown => y = height.saturating_sub(1),
+            Direction::Left => {
+                // 如果在行首左移，则吸附到上一行的行尾
+                if x>0 {
+                    x=x-1;
+                } else if y>0 {
+                    y=y.saturating_sub(1);
+                    x=self.buf.lines.get(y).map_or(0, Line::len);
+                }
+            },
+            Direction::Right => {
+                // 如果在行尾右移，则吸附到下一行的行首
+                let width=self.buf.lines.get(y).map_or(0, Line::len);
+                if x<width{
+                    x=x+1;
+                } else {
+                    y=y.saturating_add(1);
+                    x=0;
+                }
+
+            },
+            Direction::PageUp => y = y.saturating_sub(height).saturating_sub(1),
+            Direction::PageDown => y = y.saturating_add(height).saturating_sub(1),
             Direction::Home => x = 0,
-            Direction::End => x = width.saturating_sub(1),
+            Direction::End => x = self.buf.lines.get(y).map_or(0, Line::len)
         }
+
+        x=self.buf.lines.get(y).map_or(0, |line|min(line.len(),x));
+        y=min(y,self.buf.lines.len());
         self.cursor_pos = Position { x, y };
         self.scroll();
     }

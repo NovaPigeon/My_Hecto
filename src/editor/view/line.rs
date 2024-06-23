@@ -15,5 +15,7 @@ impl Line {
         let ed=min(self.string.len(),range.end);
         self.string.get(st..ed).unwrap_or("").to_string()
     }
-    
+    pub fn len(&self)->usize{
+        self.string.len()
+    }
 }
