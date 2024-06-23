@@ -1,19 +1,16 @@
 use std::fs::read_to_string;
-
+use super::line::Line;
 
 #[derive(Default)]
 pub struct Buffer {
-    pub lines: Vec<String>
+    pub lines: Vec<Line>
 }
 
 impl Buffer {
     pub fn load(file_name:&str)->Result<Self,std::io::Error>{
-        let mut lines:Vec<String>=Vec::new();
-        let file_contents=read_to_string(file_name)?;
-        for line in file_contents.lines(){
-            lines.push(String::from(line));
-        }
-        Ok(Self{lines})
+        let content = read_to_string(file_name)?;
+        let lines = content.lines().map(Line::from).collect();
+        Ok(Self { lines })
     }
     pub fn is_empty(&self)->bool{
         self.lines.is_empty()
