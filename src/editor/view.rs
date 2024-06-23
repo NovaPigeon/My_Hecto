@@ -84,7 +84,7 @@ impl View {
             return;
         }
 
-        let center_row=height/3;
+        let center_row=height.saturating_div(3);
         let top=self.scroll_offset.row;
         for row in 0..height {
             if let Some(line) =self.buf.lines.get(row.saturating_add(top)) {

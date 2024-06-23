@@ -23,6 +23,7 @@ pub enum EditorCommand{
     Quit
 }
 
+#[allow(clippy::as_conversions)]
 impl TryFrom<Event> for EditorCommand{
     type Error = String;
     fn try_from(event: Event) -> Result<Self, Self::Error> {

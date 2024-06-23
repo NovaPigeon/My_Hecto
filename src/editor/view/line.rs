@@ -13,8 +13,8 @@ enum GraphemeWidth {
 impl GraphemeWidth {
     const fn add_width(self, other: usize) -> usize {
         match self {
-            Self::Half => other + 1,
-            Self::Full => other + 2,
+            Self::Half => other.saturating_add(1),
+            Self::Full => other.saturating_add(2),
         }
     }
 }
@@ -30,12 +30,10 @@ pub struct Line{
 
 impl Line {
     pub fn from(line:&str)->Self{
-        println!("{line:?}");
         let fragments = line
             .graphemes(true)
             .map(|g| {
                 let width=g.width();
-                println!("{g:?} {width}");
                 let mut replacement=None;
                 if g==" " {
                     replacement=None;
@@ -54,7 +52,7 @@ impl Line {
                 }
 
                 let mut rendered_width=GraphemeWidth::Half;
-                if replacement==None {
+                if replacement.is_none() {
                     rendered_width=match  width {
                         0 | 1=>GraphemeWidth::Half,
                         _=>GraphemeWidth::Full
