@@ -15,18 +15,20 @@ use crossterm::{
 use std::fmt::Display;
 use std::io::{stdout, Write};
 
+
+// Position 表示显示的网格的位置
 #[derive(Debug,Clone, Copy,Default)]
-pub struct Position
+pub struct ScreenPosition
 {
-    pub x:usize,
-    pub y:usize
+    pub col:usize,
+    pub row:usize
 }
 
-impl Position {
+impl ScreenPosition {
     pub const fn subtract(&self,other:&Self)->Self{
         Self{
-            x:self.x.saturating_sub(other.x),
-            y:self.y.saturating_sub(other.y)
+            col:self.col.saturating_sub(other.col),
+            row:self.row.saturating_sub(other.row)
         }
     }
     
@@ -69,9 +71,9 @@ impl Terminal {
         Ok(())
     }
     // move the cursor to the correspond position
-    pub fn move_cursor_to(pos:Position)->Result<(),std::io::Error>{
+    pub fn move_cursor_to(pos:ScreenPosition)->Result<(),std::io::Error>{
         #[allow(clippy::as_conversions, clippy::cast_possible_truncation)]
-        Self::queue_cmd(MoveTo(pos.x as u16,pos.y as u16))?;
+        Self::queue_cmd(MoveTo(pos.col as u16,pos.row as u16))?;
         Ok(())
     }
     pub fn terminal_size()->Result<Size,std::io::Error>{
@@ -104,7 +106,7 @@ impl Terminal {
     }
 
     pub fn print_line<T:Display>(row:usize,msg:T)->Result<(),std::io::Error>{
-        Self::move_cursor_to(Position{x:0,y:row})?;
+        Self::move_cursor_to(ScreenPosition{col:0,row})?;
         Self::clear_current_line()?;
         Self::print(msg)?;
         Ok(())

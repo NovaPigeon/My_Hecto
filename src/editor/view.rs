@@ -1,4 +1,4 @@
-use super::terminal::{Position, Size, Terminal};
+use super::terminal::{ScreenPosition, Size, Terminal};
 use core::cmp::min;
 mod buffer;
 use  buffer::Buffer;
@@ -9,12 +9,20 @@ use super::editor_command::{EditorCommand,Direction};
 const NAME: &str=env!("CARGO_PKG_NAME");
 const VERSION: &str=env!("CARGO_PKG_VERSION");
 
+
+// Text Location 表示字符的位置（因为字符可能占多个宽度）
+#[derive(Debug,Clone, Copy,Default)]
+pub struct TextLocation{
+    pub grapheme_index: usize,
+    pub line_index:usize
+}
+
 pub struct View {
     buf: Buffer,
     needs_redraw:bool,
     size:Size,
-    cursor_pos:Position,
-    scroll_offset:Position
+    text_location:TextLocation,
+    scroll_offset:ScreenPosition
 }
 
 impl View {
@@ -23,11 +31,11 @@ impl View {
         self.scroll();
         self.needs_redraw=true;
     }
-    pub fn handle_cmd(&mut self,cmd:EditorCommand)
+    pub fn process_cmd(&mut self,cmd:EditorCommand)
     {
         match cmd {
             EditorCommand::Resize(new_size)=>self.resize(new_size),
-            EditorCommand::Move(dir)=>self.move_cursor(&dir),
+            EditorCommand::Move(dir)=>self.move_text_location(&dir),
             EditorCommand::Quit=>{}
         }
     }
@@ -47,48 +55,24 @@ impl View {
         }
         // Terminal::print(format!("{len} {width}\r\n"))?;
         let padding_num=(width.saturating_sub(msg.len())).saturating_div(2);
-        let padding=" ".repeat(padding_num-1);
+        let padding=" ".repeat(padding_num.saturating_sub(1));
         msg=format!("~{padding}{msg}");
-        msg.truncate(width);
         msg
     }
 
     #[allow(clippy::arithmetic_side_effects)]
-    fn move_cursor(&mut self, dir:&Direction) {
-        let Position { mut x, mut y } = self.cursor_pos;
+    fn move_text_location(&mut self, dir:&Direction) {
         let height = self.size.height;
         match dir {
-            Direction::Up => y = y.saturating_sub(1),
-            Direction::Down => y = y.saturating_add(1),
-            Direction::Left => {
-                // 如果在行首左移，则吸附到上一行的行尾
-                if x>0 {
-                    x=x-1;
-                } else if y>0 {
-                    y=y.saturating_sub(1);
-                    x=self.buf.lines.get(y).map_or(0, Line::len);
-                }
-            },
-            Direction::Right => {
-                // 如果在行尾右移，则吸附到下一行的行首
-                let width=self.buf.lines.get(y).map_or(0, Line::len);
-                if x<width{
-                    x=x+1;
-                } else {
-                    y=y.saturating_add(1);
-                    x=0;
-                }
-
-            },
-            Direction::PageUp => y = y.saturating_sub(height).saturating_sub(1),
-            Direction::PageDown => y = y.saturating_add(height).saturating_sub(1),
-            Direction::Home => x = 0,
-            Direction::End => x = self.buf.lines.get(y).map_or(0, Line::len)
+            Direction::Up => self.move_up(1),
+            Direction::Down => self.move_down(1),
+            Direction::Left => self.move_left(),
+            Direction::Right => self.move_right(),
+            Direction::PageUp => self.move_up(height.saturating_sub(1)),
+            Direction::PageDown => self.move_down(height.saturating_sub(1)),
+            Direction::Home => self.move_to_start_of_line(),
+            Direction::End => self.move_to_start_of_line()
         }
-
-        x=self.buf.lines.get(y).map_or(0, |line|min(line.len(),x));
-        y=min(y,self.buf.lines.len());
-        self.cursor_pos = Position { x, y };
         self.scroll();
     }
     pub fn render(&mut self){
@@ -101,11 +85,11 @@ impl View {
         }
 
         let center_row=height/3;
-        let top=self.scroll_offset.y;
+        let top=self.scroll_offset.row;
         for row in 0..height {
             if let Some(line) =self.buf.lines.get(row.saturating_add(top)) {
-                let left=self.scroll_offset.x;
-                let right=self.scroll_offset.x.saturating_add(width);
+                let left=self.scroll_offset.col;
+                let right=self.scroll_offset.col.saturating_add(width);
                 Self::render_line(row, &line.get(left..right));
             } else if row==center_row && self.buf.is_empty() {
                 Self::render_line(row, &Self::welcome_msg(width));
@@ -117,36 +101,103 @@ impl View {
         self.needs_redraw=false;
     }
 
-    pub fn get_position(&self)->Position{
-        self.cursor_pos.subtract(&self.scroll_offset)
+    pub fn get_cursor_position(&self)->ScreenPosition{
+        self.cursor_position_to_screen().subtract(&self.scroll_offset)
     }
     
-    pub fn load(&mut self,file_name:&str){
-        if let Ok(buffer)=Buffer::load(file_name){
+    pub fn load_file(&mut self,file_name:&str){
+        if let Ok(buffer)=Buffer::load_file(file_name){
             self.buf=buffer;
             self.needs_redraw=true;
         }
     }
+    fn cursor_position_to_screen(&self)->ScreenPosition{
+        let row = self.text_location.line_index;
+        let col = self.buf.lines.get(row).map_or(0, |line| {
+            line.width_until(self.text_location.grapheme_index)
+        });
+        ScreenPosition { col, row }
+    }
     fn scroll(&mut self ){
-        let Position{x,y}=self.cursor_pos;
+        let ScreenPosition{col,row}=self.cursor_position_to_screen();
         let Size{width,height}=self.size;
         
-        if y<self.scroll_offset.y{
-            self.scroll_offset.y=y;
+        if row<self.scroll_offset.row{
+            self.scroll_offset.row=row;
             self.needs_redraw=true;
-        } else if y>=self.scroll_offset.y.saturating_add(height){
-            self.scroll_offset.y=y.saturating_sub(height).saturating_add(1);
+        } else if row>=self.scroll_offset.row.saturating_add(height){
+            self.scroll_offset.row=row.saturating_sub(height).saturating_add(1);
             self.needs_redraw=true;
         }
 
-        if x < self.scroll_offset.x {
-            self.scroll_offset.x = x;
+        if col < self.scroll_offset.col {
+            self.scroll_offset.col = col;
             self.needs_redraw = true;
-        } else if x >= self.scroll_offset.x.saturating_add(width) {
-            self.scroll_offset.x = x.saturating_sub(width).saturating_add(1);
+        } else if col >= self.scroll_offset.col.saturating_add(width) {
+            self.scroll_offset.col = col.saturating_sub(width).saturating_add(1);
             self.needs_redraw = true;
         }
     }
+
+    fn move_up(&mut self,step:usize){
+        self.text_location.line_index=self.text_location.line_index.saturating_sub(step);
+        self.snap_to_valid_grapheme();
+        self.snap_to_valid_line();
+    }
+    fn move_down(&mut self,step:usize){
+        self.text_location.line_index=self.text_location.line_index.saturating_add(step);
+        self.snap_to_valid_grapheme();
+        self.snap_to_valid_line();
+    }
+
+    #[allow(clippy::arithmetic_side_effects)]
+    fn move_right(&mut self){
+        let line_width=self
+            .buf
+            .lines
+            .get(self.text_location.line_index)
+            .map_or(0, Line::len);
+        if self.text_location.grapheme_index<line_width{
+            self.text_location.grapheme_index+=1;
+        } else {
+            self.move_to_start_of_line();
+            self.move_down(1);
+        }
+    }
+    #[allow(clippy::arithmetic_side_effects)]
+    fn move_left(&mut self){
+        
+        if self.text_location.grapheme_index>0{
+            self.text_location.grapheme_index-=1;
+        } else {
+            self.move_up(1);
+            self.move_to_end_of_line();
+        }
+    }
+    fn move_to_start_of_line(&mut self){
+        self.text_location.grapheme_index=0;
+    } 
+    fn move_to_end_of_line(&mut self){
+        self.text_location.grapheme_index=self
+            .buf
+            .lines
+            .get(self.text_location.line_index)
+            .map_or(0, Line::len)
+    }
+
+    fn snap_to_valid_grapheme(&mut self){
+        self.text_location.grapheme_index=self
+            .buf
+            .lines
+            .get(self.text_location.line_index)
+            .map_or(0, |line| {
+                min(line.len(), self.text_location.grapheme_index)
+            })
+    }
+    fn snap_to_valid_line(&mut self) {
+        self.text_location.line_index = min(self.text_location.line_index, self.buf.lines.len());
+    }
+
 }
 
 impl  Default for View {
@@ -155,8 +206,8 @@ impl  Default for View {
             buf: Buffer::default(),
             needs_redraw:true,
             size:Terminal::terminal_size().unwrap_or_default(),
-            cursor_pos:Position::default(),
-            scroll_offset:Position::default()
+            text_location:TextLocation::default(),
+            scroll_offset:ScreenPosition::default()
         }
     }
     

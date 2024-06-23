@@ -25,7 +25,7 @@ impl Editor {
         Terminal::initialize()?;
         let mut view = View::default();
         if let Some(file_name) = std::env::args().nth(1) {
-            view.load(&file_name);
+            view.load_file(&file_name);
         }
         Ok(Self {
             should_quit: false,
@@ -60,7 +60,7 @@ impl Editor {
                     if matches!(cmd, EditorCommand::Quit) {
                         self.should_quit = true;
                     } else {
-                        self.view.handle_cmd(cmd);
+                        self.view.process_cmd(cmd);
                     }
                 },
                 Err(err) => {
@@ -80,7 +80,7 @@ impl Editor {
     fn refresh_screen(&mut self) {
         Terminal::hide_cursor().unwrap();
         self.view.render();
-        Terminal::move_cursor_to(self.view.get_position()).unwrap();
+        Terminal::move_cursor_to(self.view.get_cursor_position()).unwrap();
         Terminal::show_cursor().unwrap();
         Terminal::flush().unwrap();
     }
