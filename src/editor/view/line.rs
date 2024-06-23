@@ -41,7 +41,7 @@ impl Line {
                 TextFragment {
                     grapheme: g.to_string(),
                     rendered_width:width,
-                    replacement:replacement,
+                    replacement,
                 }
             })
             .collect();
@@ -49,7 +49,7 @@ impl Line {
     }
     pub fn get(&self,range:Range<usize>)->String{
         if range.start >= range.end {
-            return "".to_string();
+            return String::new();
         }
         let mut result = String::new();
         let mut current_pos = 0;

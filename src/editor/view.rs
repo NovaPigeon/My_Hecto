@@ -71,7 +71,7 @@ impl View {
             Direction::PageUp => self.move_up(height.saturating_sub(1)),
             Direction::PageDown => self.move_down(height.saturating_sub(1)),
             Direction::Home => self.move_to_start_of_line(),
-            Direction::End => self.move_to_start_of_line()
+            Direction::End => self.move_to_end_of_line()
         }
         self.scroll();
     }
@@ -182,7 +182,7 @@ impl View {
             .buf
             .lines
             .get(self.text_location.line_index)
-            .map_or(0, Line::len)
+            .map_or(0, Line::len);
     }
 
     fn snap_to_valid_grapheme(&mut self){
@@ -192,7 +192,7 @@ impl View {
             .get(self.text_location.line_index)
             .map_or(0, |line| {
                 min(line.len(), self.text_location.grapheme_index)
-            })
+            });
     }
     fn snap_to_valid_line(&mut self) {
         self.text_location.line_index = min(self.text_location.line_index, self.buf.lines.len());
