@@ -12,7 +12,6 @@ use crossterm::{
     
 
 };
-use std::fmt::Display;
 use std::io::{stdout, Write};
 
 
@@ -95,7 +94,7 @@ impl Terminal {
         stdout().flush()?;
         Ok(())
     }
-    pub fn print<T:Display>(msg:T)->Result<(),std::io::Error>{
+    pub fn print(msg:&str)->Result<(),std::io::Error>{
         Self::queue_cmd(Print(msg))?;
         Ok(())
     }
@@ -105,7 +104,7 @@ impl Terminal {
         Ok(())
     }
 
-    pub fn print_line<T:Display>(row:usize,msg:T)->Result<(),std::io::Error>{
+    pub fn print_line(row:usize,msg:&str)->Result<(),std::io::Error>{
         Self::move_cursor_to(ScreenPosition{col:0,row})?;
         Self::clear_current_line()?;
         Self::print(msg)?;

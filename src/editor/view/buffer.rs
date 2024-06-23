@@ -10,7 +10,7 @@ impl Buffer {
     pub fn load_file(file_name:&str)->Result<Self,std::io::Error>{
         let content = read_to_string(file_name)?;
         let lines = content.lines().map(Line::from).collect();
-        Ok(Self { lines })
+        Ok(Self{lines})
     }
     pub fn is_empty(&self)->bool{
         self.lines.is_empty()

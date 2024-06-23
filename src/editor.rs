@@ -89,6 +89,10 @@ impl Editor {
 impl Drop for Editor {
     fn drop(&mut self) {
         let _ = Terminal::terminate();
+        // for line in &self.view.buf.lines {
+        //     let str=line.get(0..1000);
+        //     println!("{str}");
+        // }
         if self.should_quit {
             let _ = Terminal::print("Goodbye.\r\n");
         }

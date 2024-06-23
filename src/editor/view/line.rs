@@ -30,17 +30,40 @@ pub struct Line{
 
 impl Line {
     pub fn from(line:&str)->Self{
+        println!("{line:?}");
         let fragments = line
             .graphemes(true)
             .map(|g| {
-                let width = match g.width() {
-                    0 | 1 => GraphemeWidth::Half,
-                    _ => GraphemeWidth::Full,
-                };
-                let replacement = if g.width() == 0 { Some('·') } else { None };
+                let width=g.width();
+                println!("{g:?} {width}");
+                let mut replacement=None;
+                if g==" " {
+                    replacement=None;
+                } else if g=="\t" {
+                    replacement=Some(' ');
+                } else if width>0 {
+                    if  g.trim().is_empty() {
+                        replacement=Some('␣');
+                    } else  if g.chars().nth(0).unwrap().is_control() {
+                        replacement=Some('▯');
+                    }
+                } else if width==0 {
+                    
+                    replacement=Some('·');
+                    
+                }
+
+                let mut rendered_width=GraphemeWidth::Half;
+                if replacement==None {
+                    rendered_width=match  width {
+                        0 | 1=>GraphemeWidth::Half,
+                        _=>GraphemeWidth::Full
+                    }
+                }
+    
                 TextFragment {
                     grapheme: g.to_string(),
-                    rendered_width:width,
+                    rendered_width,
                     replacement,
                 }
             })
